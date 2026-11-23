@@ -340,6 +340,11 @@ Cuentas y sustitución del código de familia; pagos y cuotas por familia; web a
 22. **Sin streaming de la figura en fase 1** — decisión del arquitecto. Añade complejidad de parseo parcial para ganar ~1 s solo en el primer uso mundial de cada palabra.
 23. **Fase 1 dividida en 1a (figuras) y 1b (comprensión)** — decisión del arquitecto. 1a ya resuelve "hoy me pidió un panda" y se puede usar en casa mientras se construye 1b.
 
+### 7b. Decisiones añadidas tras la revisión del implementador
+
+24. **La siembra sustituye a las figuras en vivo de las mismas palabras, pero solo las que la dueña aprueba en la hoja de contacto.** La hoja muestra la figura en vivo y la sembrada una al lado de la otra. Al publicar, se sube la versión de la clave de caché (`v2:`); L1 y KV se renuevan solos. Es aceptable que "panda" cambie una sola vez, porque en la fase 1a solo la usa una familia. Contradice la regla de inmutabilidad solo en este paso controlado.
+25. **Un detalle de forma sobre una palabra con figura local ("un perro con sombrero") genera una variante con IA (`perro|con sombrero`).** No se descarta en silencio. El prompt de figura recibe la figura local como referencia, para que la variante conserve sus proporciones y la paleta. Sin detalle, sigue respondiendo `builtin`.
+
 ## 8. A criterio del implementador
 
 - Nombres exactos de módulos, funciones y rutas internas; si el router del Worker usa una librería o es manual.
