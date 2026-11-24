@@ -19,12 +19,16 @@
   "ratelimits": [
     { "name": "FIGURE_LIMITER", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } }
   ],
-  // Secretos (no van aquí): `wrangler secret put ANTHROPIC_API_KEY` y `wrangler secret put FAMILY_CODES`.
-  "vars": { "DAILY_FIGURE_CAP": "300", "ALLOWED_ORIGINS": "" },
+  // IA de dibujo por defecto: Workers AI (gratis, sin clave). Si existe el secreto ANTHROPIC_API_KEY, manda Claude.
+  // AI_MODEL (var opcional) cambia el modelo de Workers AI (por defecto @cf/openai/gpt-oss-120b).
+  "ai": { "binding": "AI" },
+  // Secretos (no van aquí): `wrangler secret put FAMILY_CODES` y, si se quiere Claude, `wrangler secret put ANTHROPIC_API_KEY`.
+  "vars": { "DAILY_FIGURE_CAP": "300", "ALLOWED_ORIGINS": "https://your-bedtime-story.davidcueva-dico.workers.dev" },
   "env": {
     // `npx wrangler deploy --env preview`: KV, límites y secretos propios (código de familia distinto).
-    // kv_namespaces, ratelimits y vars no se heredan: hay que repetirlos en cada entorno.
+    // kv_namespaces, ratelimits, vars y ai no se heredan: hay que repetirlos en cada entorno.
     "preview": {
+      "ai": { "binding": "AI" },
       "kv_namespaces": [{ "binding": "FIGURES", "id": "9a84529c85f7419a862e1a78cfb058fe" }],
       "ratelimits": [
         { "name": "FIGURE_LIMITER", "namespace_id": "1002", "simple": { "limit": 20, "period": 60 } }

@@ -1,4 +1,4 @@
-import { createFigureGenerator } from '../worker/figure-ai.js';
+import { createFigureGenerator, createWorkersAIGenerator, parseAIResult } from '../worker/figure-ai.js';
 import { FIGURE_SYSTEM_PROMPT, buildFigurePrompt, figureExample } from '../worker/prompts/figure.js';
 import { FIGURE_SCHEMA, sanitizeFigure } from '../lib/figure-format.js';
 import { FIG, isBuiltinKey } from '../lib/figures.js';
@@ -89,4 +89,45 @@ test('ejemplos convertidos desde FIG: válidos para el esquema y estables al san
   expect(figureExample('gato').prims[0]).toEqual({ t: 'line', n: [70, 78, 86, 64, 84, 48], color: 'ink' });
   // El árbol del ejemplo: tronco y copa de círculos solapados
   expect(figureExample('arbol').prims.map(p => p.t)).toEqual(['rect', 'circle', 'circle', 'circle', 'circle']);
+});
+
+// --- Workers AI ---
+// Binding falso: guarda (modelo, cuerpo) y devuelve la respuesta configurada (o lanza).
+function fakeAI(response) {
+  const calls = [];
+  return { calls, run: async (model, body) => { calls.push({ model, body }); if (response instanceof Error) throw response; return response; } };
+}
+const wai = response => createWorkersAIGenerator({ ai: fakeAI(response) });
+
+test('Workers AI: petición correcta y modelo configurable', async () => {
+  const ai = fakeAI({ response: PANDA });
+  expect(await createWorkersAIGenerator({ ai })('panda')).toEqual(PANDA);
+  const { model, body } = ai.calls[0];
+  expect(model).toBe('@cf/openai/gpt-oss-120b');
+  expect(body).toEqual({
+    messages: [{ role: 'system', content: FIGURE_SYSTEM_PROMPT }, { role: 'user', content: '<concepto>panda</concepto>' }],
+    response_format: { type: 'json_schema', json_schema: FIGURE_SCHEMA }, max_tokens: 3000,
+  });
+  await createWorkersAIGenerator({ ai, model: '@cf/otro' })('vaca');
+  expect(ai.calls[1].model).toBe('@cf/otro');
+});
+
+test('Workers AI: todas las formas de respuesta dan la figura', async () => {
+  const s = JSON.stringify(PANDA);
+  for (const r of [PANDA, s, { response: s }, { response: PANDA }, { choices: [{ message: { content: s }, finish_reason: 'stop' }] },
+    { output: [{ type: 'reasoning', content: [] }, { type: 'message', content: [{ type: 'output_text', text: s }] }] }]) {
+    expect(await wai(r)('panda')).toEqual(PANDA);
+  }
+  const blocked = { status: 'blocked', canonical: 'pistola', band: 'ground', size: 100, layer: 2, main: 'none', prims: [] };
+  expect(sanitizeFigure(await wai({ response: JSON.stringify(blocked) })('pistola'))).toMatchObject({ status: 'blocked' });
+});
+
+test('Workers AI: basura, truncado o error → null', async () => {
+  for (const r of [null, undefined, '', '{roto', 'hola', 42, [], {}, { response: '{"status":' }, { response: null },
+    { choices: [] }, { choices: [{ message: { content: '{roto' } }] }, { choices: [{ message: { content: JSON.stringify(PANDA) }, finish_reason: 'length' }] },
+    { output: [{ content: [{ type: 'output_text' }] }] }, { response: '"\\"\\""' }]) {
+    expect(await wai(r)('panda')).toBeNull();
+  }
+  expect(await wai(new Error('3040: capacity'))('panda')).toBeNull();
+  expect(parseAIResult(JSON.stringify(JSON.stringify(JSON.stringify(JSON.stringify(JSON.stringify(PANDA))))))).toBeNull(); // sin recursión sin fin
 });

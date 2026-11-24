@@ -34,11 +34,17 @@ El micrófono solo funciona en `localhost` o en una web con **https**. Un archiv
 
 ## Dibujos nuevos con IA (código de familia)
 
-Las palabras de la lista se dibujan siempre, sin red. Con un **código de familia**, la app también pide a la IA (Claude) las palabras que no conoce: "una vaca", "un panda"… La figura se guarda y la próxima vez sale al instante. Sin código, o sin red, la app funciona igual que siempre.
+Las palabras de la lista se dibujan siempre, sin red. Con un **código de familia**, la app también pide a la IA las palabras que no conoce: "una vaca", "un panda"… La figura se guarda y la próxima vez sale al instante. Sin código, o sin red, la app funciona igual que siempre.
 
 - El código se escribe una vez por dispositivo en **Palabras que sabe dibujar y trucos → Código de familia**, o se abre el enlace `https://TU-DOMINIO/?codigo=EL-CODIGO` (la app guarda el código y lo quita de la barra de direcciones). Reparte ese enlace solo a quien quieras.
 - Para quitar un código, vuelve a guardar `FAMILY_CODES` sin él (ver abajo).
 - Privacidad: el reconocimiento de voz lo hace el navegador (en Chrome y Safari, el servicio de voz del fabricante). A la IA solo se envía la palabra que hay que dibujar. No se guarda audio ni el cuento.
+
+## IA de dibujo
+
+- **Por defecto, Workers AI** (binding `AI` en `wrangler.jsonc`, modelo `@cf/openai/gpt-oss-120b`): gratis dentro del plan gratuito de Cloudflare y sin ninguna clave. Es lento (12–43 s por figura): la primera vez que sale una palabra nueva el navegador deja de esperar a los 8 s, pero el Worker termina de dibujarla y la guarda; la siguiente vez sale al instante. Lo que tarde más de ~38 s se pierde y se reintenta en la siguiente mención. Para otro modelo, añade `AI_MODEL` en `vars`.
+- **Claude**, si existe el secreto `ANTHROPIC_API_KEY` (`npx wrangler secret put ANTHROPIC_API_KEY`): más rápido (cabe en los 8 s), de pago. Para volver a Workers AI: `npx wrangler secret delete ANTHROPIC_API_KEY`.
+- `MOCK_AI=1` (solo en local) usa figuras de prueba sin red.
 
 ## Probar en local con el Worker (`npm run preview`)
 
@@ -47,7 +53,7 @@ cp .dev.vars.example .dev.vars   # MOCK_AI=1, FAMILY_CODES=dev: figuras de prueb
 npm run preview                  # next build && wrangler dev → http://localhost:8787/?codigo=dev
 ```
 
-`.dev.vars` guarda secretos locales y **nunca** se sube a git. Para probar con Claude de verdad, quita `MOCK_AI=1` y pon tu `ANTHROPIC_API_KEY`.
+`.dev.vars` guarda secretos locales y **nunca** se sube a git. Para probar con IA de verdad, quita `MOCK_AI=1`: sin clave usa Workers AI (necesita `npx wrangler login`), con `ANTHROPIC_API_KEY` usa Claude.
 
 `npm run dev` sigue sirviendo solo la interfaz, sin `/api`: la app funciona en modo local (solo las palabras de la lista).
 
@@ -62,15 +68,15 @@ Un solo Worker sirve la web estática (`/out`) y la API (`/api/*`). Toda la conf
    ```
 3. Guarda los secretos (se piden por teclado, no se escriben en ningún archivo):
    ```bash
-   npx wrangler secret put ANTHROPIC_API_KEY   # clave de la consola de Anthropic
    npx wrangler secret put FAMILY_CODES        # códigos separados por comas, p. ej. abuela-luna,casa-sol
+   npx wrangler secret put ANTHROPIC_API_KEY   # opcional: solo si quieres Claude en vez de Workers AI
    ```
 4. Publica: `npm run build && npx wrangler deploy`. Abre la URL `*.workers.dev` en el móvil, permite el micrófono y a contar.
-5. En `vars` de `wrangler.jsonc`: `DAILY_FIGURE_CAP` (figuras nuevas al día, 300) y `ALLOWED_ORIGINS` (orígenes permitidos separados por comas; vacío = no se comprueba). **Al publicar, pon en `ALLOWED_ORIGINS` el dominio real de la app** (p. ej. `https://your-story.TU-CUENTA.workers.dev` o `https://tu-dominio.com`, sin barra final) y vuelve a publicar: vacío solo vale para desarrollo local.
+5. En `vars` de `wrangler.jsonc`: `DAILY_FIGURE_CAP` (figuras nuevas al día, 300) y `ALLOWED_ORIGINS` (orígenes permitidos separados por comas; vacío = no se comprueba). **Al publicar, pon en `ALLOWED_ORIGINS` el dominio real de la app** (p. ej. `https://your-story.TU-CUENTA.workers.dev` o `https://tu-dominio.com`, sin barra final) y vuelve a publicar: vacío solo vale para desarrollo local. Ya viene puesto `https://your-bedtime-story.davidcueva-dico.workers.dev` (en local, `.dev.vars` lo deja vacío).
 
 **Entorno de pruebas** (`preview`): tiene su propio KV y sus propios secretos. Crea el KV con `npx wrangler kv namespace create FIGURES --env preview`, pega el id en `env.preview`, repite el paso 3 con `--env preview` (con un código de familia distinto) y publica con `npx wrangler deploy --env preview`.
 
-**Límite de gasto**: usa una clave de un workspace propio y pon en la consola de Anthropic (**Settings → Limits**) un límite de gasto mensual de **10 $**. Es el último cortafuegos: además, el Worker limita a 20 figuras por minuto por código y dirección IP, y a `DAILY_FIGURE_CAP` figuras nuevas al día en total. Un cuento típico cuesta céntimos.
+**Límite de gasto** (solo con Claude): usa una clave de un workspace propio y pon en la consola de Anthropic (**Settings → Limits**) un límite de gasto mensual de **10 $**. Es el último cortafuegos: además, el Worker limita a 20 figuras por minuto por código y dirección IP, y a `DAILY_FIGURE_CAP` figuras nuevas al día en total. Un cuento típico cuesta céntimos.
 
 ## Subir a GitHub por primera vez
 

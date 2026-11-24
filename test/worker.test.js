@@ -279,3 +279,15 @@ test('un negativo viejo bajo una clave hecha a mano no estropea el builtin', asy
   expect(await (await handleApi(req({ concept: 'perrazo' }), env, g)).json()).toEqual({ status: 'builtin', key: 'perro' });
   expect(g.generated()).toBe(1);
 });
+test('index con Workers AI lento: la figura acaba en KV vía waitUntil aunque el navegador ya no espere', async () => {
+  const waits = []; let release;
+  env.AI = { run: () => new Promise(r => { release = () => r({ response: JSON.stringify(mockGenerateFigureSync('tapir')) }); }) };
+  const pending = worker.fetch(req({ concept: 'tapir' }), env, { waitUntil: p => waits.push(p) });
+  await vi.waitFor(() => expect(waits).toHaveLength(1)); // la generación ya está en waitUntil antes de responder
+  release(); await waits[0];
+  expect(JSON.parse(env.FIGURES.map.get('fig:v1:tapir')).status).toBe('ok');
+  expect((await (await pending).json()).status).toBe('ok');
+  expect((await worker.fetch(req({ concept: 'tapir' }), env)).status).toBe(200); // segunda mención: caché
+});
+const mockGenerateFigureSync = w => ({ status: 'ok', canonical: w, band: 'ground', size: 110, layer: 1, main: 'grey',
+  prims: [{ t: 'ellipse', n: [55, 72, 26, 16], color: 'grey' }, { t: 'circle', n: [28, 52, 14], color: 'grey' }] });

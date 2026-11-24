@@ -1,4 +1,7 @@
 # Copia este archivo a .dev.vars para `npm run preview` (nunca subas .dev.vars).
 MOCK_AI=1
 FAMILY_CODES=dev
+# Vacío = sin comprobar origen (wrangler.jsonc trae el dominio de producción, que rechazaría localhost).
+ALLOWED_ORIGINS=
+# Sin MOCK_AI y sin clave se usa Workers AI (pide `npx wrangler login`); con clave, Claude.
 ANTHROPIC_API_KEY=
