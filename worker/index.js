@@ -5,10 +5,11 @@ import { mockGenerateFigure, createFigureGenerator } from './figure-ai.js';
 
 // Generador de Claude: uno por isolate, creado al generar la primera figura (no antes), así ni las pruebas
 // ni MOCK_AI ni las peticiones rechazadas tocan el SDK. Sin clave la llamada falla: generate da null (502),
-// y si algo lanzara aquí, handleApi también lo trata como fallo de generación.
+// y si algo lanzara aquí, handleApi también lo trata como fallo de generación. Tiempo máximo 10 s (en ms) y sin
+// reintentos: el navegador abandona a los 8 s y no queremos seguir pagando por peticiones abandonadas.
 let claudeGenerate;
 const generateWithClaude = (env, word) =>
-  (claudeGenerate ??= createFigureGenerator({ client: new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }) }))(word);
+  (claudeGenerate ??= createFigureGenerator({ client: new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, timeout: 10_000, maxRetries: 0 }) }))(word);
 
 async function fetch(request, env) {
   if (new URL(request.url).pathname.startsWith('/api/')) {

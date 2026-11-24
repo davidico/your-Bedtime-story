@@ -38,7 +38,11 @@ test('normalización y validación de conceptos', () => {
 test('extra: esquema, claves de alias, escalado de figuras pequeñas y expansión', () => {
   expect(FORMAT_VERSION).toBe('v1'); expect(aliasKey('pandita')).toBe('alias:v1:pandita');
   expect(FIGURE_SCHEMA.properties.main.enum).toEqual(['none', ...PALETTE_KEYS]);
-  expect(FIGURE_SCHEMA.properties.prims.items.properties.color.enum).toEqual(['ink', ...PALETTE_KEYS]);
+  expect(FIGURE_SCHEMA.properties.prims.items.properties.color.enum).toEqual(['ink', ...PALETTE_KEYS.filter(k => k !== 'ink')]);
+  // Todos los enum del esquema sin valores repetidos (la API podría rechazarlo)
+  const enums = []; (function walk(o) { if (o && typeof o === 'object') { if (Array.isArray(o.enum)) enums.push(o.enum); Object.values(o).forEach(walk); } })(FIGURE_SCHEMA);
+  expect(enums.length).toBeGreaterThanOrEqual(6);
+  for (const e of enums) expect(new Set(e).size).toBe(e.length);
   expect(Number.isInteger(sanitizeFigure(ok([body, head], { size: 133.7 })).size)).toBe(true);
   // Figura de 20 de alto: se escala a ~80 y toca el suelo; sanear dos veces no cambia nada.
   const tiny = sanitizeFigure(ok([{ t: 'rect', n: [40, 10, 60, 30], color: 'red' }, { t: 'line', n: [40, 10, 60, 30], color: 'ink' }]));
