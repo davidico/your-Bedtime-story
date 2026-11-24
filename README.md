@@ -66,7 +66,7 @@ Un solo Worker sirve la web estática (`/out`) y la API (`/api/*`). Toda la conf
    npx wrangler secret put FAMILY_CODES        # códigos separados por comas, p. ej. abuela-luna,casa-sol
    ```
 4. Publica: `npm run build && npx wrangler deploy`. Abre la URL `*.workers.dev` en el móvil, permite el micrófono y a contar.
-5. En `vars` de `wrangler.jsonc`: `DAILY_FIGURE_CAP` (figuras nuevas al día, 300) y `ALLOWED_ORIGINS` (orígenes permitidos separados por comas, p. ej. `https://tu-dominio.com`; vacío = no se comprueba).
+5. En `vars` de `wrangler.jsonc`: `DAILY_FIGURE_CAP` (figuras nuevas al día, 300) y `ALLOWED_ORIGINS` (orígenes permitidos separados por comas; vacío = no se comprueba). **Al publicar, pon en `ALLOWED_ORIGINS` el dominio real de la app** (p. ej. `https://your-story.TU-CUENTA.workers.dev` o `https://tu-dominio.com`, sin barra final) y vuelve a publicar: vacío solo vale para desarrollo local.
 
 **Entorno de pruebas** (`preview`): tiene su propio KV y sus propios secretos. Crea el KV con `npx wrangler kv namespace create FIGURES --env preview`, pega el id en `env.preview`, repite el paso 3 con `--env preview` (con un código de familia distinto) y publica con `npx wrangler deploy --env preview`.
 

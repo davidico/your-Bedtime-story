@@ -33,6 +33,7 @@ function percentile(values, p) {
   return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(p / 100 * sorted.length) - 1))];
 }
 
+const plain = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/\s+/g, ' ');
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const ptsAttr = pts => pts.map(([x, y]) => `${+x.toFixed(2)},${+y.toFixed(2)}`).join(' ');
 
@@ -67,16 +68,17 @@ async function main() {
 
   const rows = [];
   // En serie a propósito: medir latencia y caché sin que las llamadas compitan entre sí.
-  for (const concept of readConcepts()) {
-    // Como el Worker: el modelo recibe la palabra tal cual (con tildes); el concepto normalizado es la clave.
-    const word = normalizeConcept(concept);
+  for (const label of readConcepts()) {
+    // Como en producción: el navegador manda la palabra sin tildes ni mayúsculas (sin singularizar) y el Worker
+    // se la pasa al modelo; el concepto normalizado (singular) es la clave de caché.
+    const word = plain(label), concept = normalizeConcept(label);
     const t0 = performance.now();
-    const raw = await generate(concept);
+    const raw = await generate(word);
     const ms = Math.round(performance.now() - t0);
     const fig = raw ? sanitizeFigure(raw) : null;
     const status = !raw ? 'error' : !fig ? 'invalid' : fig.status;
-    rows.push({ concept, word, ms, status, fig });
-    console.log(`${concept.padEnd(16)} ${String(ms).padStart(6)} ms  ${status}${fig && fig.canonical !== word ? ` → ${fig.canonical}` : ''}`);
+    rows.push({ label, concept, ms, status, fig });
+    console.log(`${label.padEnd(16)} ${String(ms).padStart(6)} ms  ${status}${fig && fig.canonical !== concept ? ` → ${fig.canonical}` : ''}`);
   }
 
   const lat = rows.map(r => r.ms);
@@ -93,17 +95,23 @@ async function main() {
     ` · cache_read_input_tokens ${usage.cache_read_input_tokens}\nHoja escrita en ${out}`);
 }
 
+const EMPTY = { blocked: 'bloqueada', not_drawable: 'no se dibuja', invalid: 'inválida', error: 'sin respuesta' };
+const empty = text => `<div class="empty">${esc(text)}</div>`;
+// Una tarjeta que no se puede pintar no tumba la hoja entera.
 function cardSvg({ status, fig }) {
-  if (status === 'ok') return primsToSvg(expandFigure(fig).draw(), fig.band);
-  if (status === 'builtin' && isBuiltinKey(fig.canonical)) return primsToSvg(FIG[fig.canonical].draw(), FIG[fig.canonical].band);
-  return `<div class="empty">${{ blocked: 'bloqueada', not_drawable: 'no se dibuja', invalid: 'inválida', error: 'sin respuesta' }[status] || esc(status)}</div>`;
+  try {
+    const own = fig && plain(fig.canonical);
+    if (status === 'ok') return primsToSvg(expandFigure(fig).draw(), fig.band);
+    if (status === 'builtin' && isBuiltinKey(own)) return primsToSvg(FIG[own].draw(), FIG[own].band);
+    return empty(EMPTY[status] || status);
+  } catch { return empty('no se pudo pintar'); }
 }
 
 function renderPage({ label, simulated, rows, stats, usage }) {
   const cards = rows.map(r => {
-    const canon = r.fig && r.fig.canonical !== r.word ? ` <span class="canon">→ ${esc(r.fig.canonical)}</span>` : '';
+    const canon = r.fig && r.fig.canonical !== r.concept ? ` <span class="canon">→ ${esc(r.fig.canonical)}</span>` : '';
     const meta = r.fig && r.status === 'ok' ? `<span>${esc(r.fig.band)} · ${r.fig.size} · ${r.fig.prims.length} prims</span>` : '';
-    return `<figure class="card s-${esc(r.status)}">${cardSvg(r)}<figcaption><b>${esc(r.concept)}</b>${canon}` +
+    return `<figure class="card s-${esc(r.status)}">${cardSvg(r)}<figcaption><b>${esc(r.label)}</b>${canon}` +
       `<span class="row"><span class="st">${esc(r.status)}</span><span>${r.ms} ms</span></span>${meta}</figcaption></figure>`;
   }).join('\n');
   const when = new Date().toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
