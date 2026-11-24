@@ -1,0 +1,4 @@
+# Copia este archivo a .dev.vars para `npm run preview` (nunca subas .dev.vars).
+MOCK_AI=1
+FAMILY_CODES=dev
+ANTHROPIC_API_KEY=
