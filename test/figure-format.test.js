@@ -60,6 +60,8 @@ test('sanear es idempotente (propiedad con figuras aleatorias y casos límite)',
     const n = t === 'circle' || t === 'dot' ? [num(), num(), rad()] : t === 'ellipse' ? [num(), num(), rad(), rad()]
       : t === 'rect' ? [num(), num(), num(), num()] : Array.from({ length: 2 * (2 + Math.floor(R() * 6)) }, num);
     if (R() < 0.3) for (let i = 0; i < n.length; i++) n[i] = n[i] / 8 + 50; // figuras pequeñas: activan el escalado
+    else if (R() < 0.15) { const sy = [0.001, 0.003, 0.005, 0.01][Math.floor(R() * 4)], sx = R() < 0.5 ? sy : 0.5; // extensión diminuta
+      for (let i = 0; i < n.length; i++) n[i] = 50 + (n[i] - 50) * (i % 2 ? sy : sx); }
     return { t, n, color };
   };
   const figs = Array.from({ length: 600 }, () => ok(Array.from({ length: 2 + Math.floor(R() * 8) }, randPrim), { band: R() < 0.8 ? 'ground' : 'sky' }));
@@ -69,6 +71,12 @@ test('sanear es idempotente (propiedad con figuras aleatorias y casos límite)',
     ok([{ t: 'rect', n: [0, 50, 100, 52], color: 'white' }, { t: 'circle', n: [0, 51, 1.333], color: 'red' }]), // ancha y plana
     ok([{ t: 'circle', n: [33.333, 33.337, 3.333], color: 'white' }, { t: 'circle', n: [66.667, 30.001, 3.337], color: 'red' }]),
   );
+  // Extensiones verticales diminutas (h ≈ 0.1, 0.5, 0.99 y 0), con anchura normal o también diminuta.
+  for (const h of [0.1, 0.5, 0.99, 0]) for (const w of [32, 0.2]) {
+    figs.push(ok([{ t: 'rect', n: [50 - w / 2, 49.65, 50 + w / 2, 49.65 + h], color: 'white' }, { t: 'line', n: [50 - w / 2, 49.65, 50, 49.65 + h / 2], color: 'ink' }]));
+    figs.push(ok([{ t: 'poly', n: [16, 49.7, 50, 49.7 + h, 50 + w, 49.7], color: 'red' }, { t: 'rect', n: [20, 49.7, 30, 49.7 + h], color: 'white' }]));
+  }
+  figs.push(ok([{ t: 'rect', n: [16, 49.65, 49, 49.75], color: 'white' }, { t: 'rect', n: [40, 49.7, 88, 49.75], color: 'red' }]));
   let checked = 0;
   for (const f of figs) {
     const a = sanitizeFigure(f); if (!a) continue;
