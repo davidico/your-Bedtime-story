@@ -1,7 +1,7 @@
 import { createFigureGenerator } from '../worker/figure-ai.js';
 import { FIGURE_SYSTEM_PROMPT, buildFigurePrompt, figureExample } from '../worker/prompts/figure.js';
 import { FIGURE_SCHEMA, sanitizeFigure } from '../lib/figure-format.js';
-import { FIG } from '../lib/figures.js';
+import { FIG, isBuiltinKey } from '../lib/figures.js';
 
 // Cliente falso: guarda los argumentos de messages.create y devuelve la respuesta configurada (o lanza).
 function fakeClient(response) {
@@ -60,8 +60,11 @@ test('prompt determinista y con lo esencial', () => {
   const builtin = FIGURE_SYSTEM_PROMPT.match(/Figuras propias: ([^\n]+)/)[1].split(', ');
   expect(builtin).toContain('castillo'); expect(builtin).toContain('dragon');
   expect(builtin).not.toContain('mar'); expect(builtin).not.toContain('__pending');
+  expect(builtin).toEqual(Object.keys(FIG).filter(isBuiltinKey));
   expect(FIGURE_SYSTEM_PROMPT).not.toMatch(/#[0-9a-f]{6}/i); // nada de hex: solo claves de paleta
   expect(FIGURE_SYSTEM_PROMPT.length).toBeLessThan(14000);
+  expect(FIGURE_SYSTEM_PROMPT).not.toMatch(/calavera/); expect(FIGURE_SYSTEM_PROMPT).toMatch(/explosivos \(bomba/);
+  expect(FIGURE_SYSTEM_PROMPT).toContain('la y va de 0 (arriba) a 100 (abajo)');
 });
 
 test('ejemplos convertidos desde FIG: válidos para el esquema y estables al sanear', () => {
@@ -72,8 +75,10 @@ test('ejemplos convertidos desde FIG: válidos para el esquema y estables al san
       expect(['poly', 'line', 'circle', 'ellipse', 'rect', 'dot']).toContain(p.t);
       expect(p.n.every(Number.isInteger)).toBe(true);
       if (p.t === 'poly' || p.t === 'line') expect(p.n.length).toBeLessThanOrEqual(48);
+      if (p.t === 'poly') expect(p.n.length).toBeLessThanOrEqual(32); // nada de polígonos largos en los ejemplos
     }
-    expect(sanitizeFigure(ex)).not.toBeNull();
+    expect(sanitizeFigure(ex)).toEqual(ex);
+    if (ex.band === 'ground') expect(Math.max(...ex.prims.flatMap(p => p.t === 'circle' || p.t === 'dot' ? [p.n[1] + p.n[2]] : p.t === 'ellipse' ? [p.n[1] + p.n[3]] : p.n.filter((_, i) => i % 2)))).toBe(100);
     expect(FIGURE_SYSTEM_PROMPT).toContain(JSON.stringify(ex));
   }
   // Reconoce formas: el oso son círculos con ojos de punto; la casa, rectángulos
@@ -82,4 +87,6 @@ test('ejemplos convertidos desde FIG: válidos para el esquema y estables al san
   expect(oso.prims.filter(p => p.t === 'dot')).toHaveLength(3);
   expect(figureExample('casa').prims[0]).toEqual({ t: 'rect', n: [18, 46, 82, 100], color: 'sand' });
   expect(figureExample('gato').prims[0]).toEqual({ t: 'line', n: [70, 78, 86, 64, 84, 48], color: 'ink' });
+  // El árbol del ejemplo: tronco y copa de círculos solapados
+  expect(figureExample('arbol').prims.map(p => p.t)).toEqual(['rect', 'circle', 'circle', 'circle', 'circle']);
 });

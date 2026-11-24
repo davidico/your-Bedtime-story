@@ -1,7 +1,8 @@
 // Prompt de sistema para generar figuras (spec §5.6). Se construye una sola vez al cargar el módulo y es
 // constante byte a byte (sin fechas ni IDs) para que la caché de prompts funcione; lo variable va en el turno
 // de usuario dentro de <concepto>…</concepto>. Los ejemplos salen de las figuras locales de FIG.
-import { FIG, P, PALETTE_KEYS } from '../../lib/figures.js';
+import { FIG, P, PALETTE_KEYS, isBuiltinKey, S, rect, circ } from '../../lib/figures.js';
+import { sanitizeFigure } from '../../lib/figure-format.js';
 
 // Nombre en español de cada color de la paleta (lo que ve el modelo; nunca hex).
 const COLOR_NAMES = {
@@ -13,7 +14,12 @@ const COLOR_NAMES = {
 const EXAMPLES = ['gato', 'perro', 'casa', 'arbol', 'coche', 'pajaro', 'oso', 'persona'];
 const PLACEMENT = ['pajaro', 'pez', 'gato', 'persona', 'arbol', 'casa', 'castillo', 'montana'];
 // Claves locales que el modelo puede devolver con status "builtin": todas menos las internas.
-const builtinKeys = () => Object.keys(FIG).filter(k => k !== 'mar' && !k.startsWith('__') && !k.startsWith('g:'));
+const builtinKeys = () => Object.keys(FIG).filter(isBuiltinKey);
+// Dibujo alternativo solo para el ejemplo: la copa ondulada del árbol (44 puntos) enseña mal; mejor círculos solapados.
+const EXAMPLE_DRAW = {
+  arbol: () => [S(rect(44, 58, 56, 100), P.brown), S(circ(34, 46, 15), P.green), S(circ(66, 46, 15), P.green),
+    S(circ(50, 28, 18), P.green), S(circ(50, 50, 16), P.green)],
+};
 
 // hex → clave de paleta; un hex fuera de la paleta va al color más cercano.
 const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
@@ -56,10 +62,11 @@ function toPrim(p) {
   return { t: 'poly', n: flat(p.pts), color };
 }
 
-/** Ejemplo en el formato de salida a partir de una figura local de FIG. */
+/** Ejemplo en el formato de salida a partir de una figura local de FIG, ya saneado (las de suelo tocan y=100). */
 export function figureExample(key) {
-  const f = FIG[key];
-  return { status: 'ok', canonical: key, band: f.band, size: f.size, layer: f.layer ?? 2, main: f.main, prims: f.draw().map(toPrim) };
+  const f = FIG[key], draw = EXAMPLE_DRAW[key] || f.draw;
+  const ex = { status: 'ok', canonical: key, band: f.band, size: f.size, layer: f.layer ?? 2, main: f.main, prims: draw().map(toPrim) };
+  return sanitizeFigure(ex) || ex;
 }
 
 /** Construye el prompt de sistema. Determinista: misma salida en cada llamada. */
@@ -70,7 +77,7 @@ export function buildFigurePrompt() {
   return `Eres el ilustrador de un cuaderno infantil dibujado a lápiz para niños de 2 a 6 años. Mientras un adulto cuenta un cuento en voz alta, tú dibujas cada cosa que se nombra. Tus dibujos son simples, grandes, reconocibles al primer vistazo y amables, como los que haría un adulto cariñoso con lápices de colores.
 
 # Formato
-Respondes solo con un objeto JSON que sigue el esquema dado. La figura se dibuja en una caja local de 100×100: x va de 0 (izquierda) a 100 (derecha), y de 0 (arriba) a 100 (abajo). En figuras de suelo, el suelo está en y=100 y la figura se apoya en él, centrada en x=50. Usa números enteros.
+Respondes solo con un objeto JSON que sigue el esquema dado. La figura se dibuja en una caja local de 100×100: la x va de 0 (izquierda) a 100 (derecha); la y va de 0 (arriba) a 100 (abajo). En figuras de suelo, el suelo está en y=100 y la figura se apoya en él, centrada en x=50. Usa números enteros.
 Cada primitiva es {"t", "n", "color"}; "n" depende de "t":
 - "poly": [x1,y1,x2,y2,…] polígono cerrado relleno con contorno a lápiz (3 a 24 puntos).
 - "line": [x1,y1,x2,y2,…] trazo abierto de lápiz, sin relleno (2 a 24 puntos): patas, colas, rayos, tallos.
@@ -105,7 +112,7 @@ ${examples}
 - "builtin": el concepto es (o es un sinónimo o diminutivo de) una de nuestras figuras propias. Entonces "canonical" es exactamente esa clave y "prims" va vacío. Ejemplos: "can" → "perro", "gatito" → "gato", "vivienda" → "casa". Solo si es la misma cosa: un tigre no es un gato.
 Figuras propias: ${builtinKeys().join(', ')}
 - "not_drawable": no es algo que se pueda dibujar como objeto (ideas abstractas, sentimientos, tiempo, acciones, palabras sueltas sin sentido): "ayer", "rápido", "tristeza", "correr", "porque".
-- "blocked": contenido que no es para niños pequeños. Se bloquea: contenido sexual o desnudez; sangre, heridas o violencia explícita; armas de fuego (pistola, rifle, metralleta, bomba); drogas, alcohol y tabaco; símbolos de odio e insultos; personas reales o famosas. Sí se dibujan, siempre amables: monstruos, dragones, brujas, fantasmas, lobos, piratas, espadas y cañones de cuento, calaveras de pirata simpáticas.
+- "blocked": contenido que no es para niños pequeños. Se bloquea: contenido sexual o desnudez; sangre, heridas o violencia explícita; armas de fuego (pistola, rifle, metralleta); explosivos (bomba, granada, dinamita); drogas, alcohol y tabaco; símbolos de odio e insultos; personas reales o famosas. Sí se dibujan, siempre amables: monstruos, dragones, brujas, fantasmas, lobos, piratas, espadas y cañones de cuento.
 Con "builtin", "not_drawable" o "blocked": "prims" vacío y "main" "none"; "band" "ground", "size" 100, "layer" 2.
 "canonical": el nombre de la cosa en español, sustantivo en singular, minúsculas y sin tildes, sin diminutivos ni colores ni tamaños ("pandita" → "panda", "vacas rojas" → "vaca", "dinosaurio grande" → "dinosaurio"). Se dibuja la cosa normal; el color y el tamaño los pone la aplicación.
 

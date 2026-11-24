@@ -1,7 +1,7 @@
 // POST /api/figure (spec §5.2, §5.8, §5.9): controles en orden fijo, lista negra, caché en KV y tope diario.
 // Privacidad: nunca se registra el cuerpo (ni concepto ni palabra). En KV solo figuras, alias, negativos y el contador.
 import { sanitizeFigure, normalizeConcept, isValidConcept, figureKey, aliasKey } from '../lib/figure-format.js';
-import { FIG } from '../lib/figures.js';
+import { isBuiltinKey } from '../lib/figures.js';
 import { isBlocked } from './blocklist.js';
 
 const MAX_BODY = 2048, NEG_TTL = 2592000, COUNT_TTL = 172800, DEFAULT_CAP = 300;
@@ -11,8 +11,6 @@ const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(b
 const list = s => (typeof s === 'string' ? s.split(',').map(x => x.trim()).filter(Boolean) : null);
 // Minúsculas y sin tildes, sin singularizar (la palabra que ve el modelo).
 const plain = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\s+/g, ' ');
-// builtin válido: clave propia de FIG, ni interna, ni generada, ni de fondo fijo (misma regla que lib/ai.js).
-const isBuiltinKey = k => Object.hasOwn(FIG, k) && !k.startsWith('__') && !k.startsWith('g:') && FIG[k].band !== 'fixed';
 // Respuesta pública: la figura solo viaja si se dibuja.
 const reply = f => json(f.status === 'ok' ? { status: 'ok', key: f.canonical, figure: f } : { status: f.status, key: f.canonical });
 const negative = concept => ({ status: 'blocked', canonical: concept, band: 'ground', size: 120, layer: 1, main: 'none', prims: [] });
