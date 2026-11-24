@@ -11,8 +11,15 @@ test('pendiente, relación y sustitución en su sitio', () => {
   const it = s.items.find(i => i.id === id);
   expect(it.pending).toBe(true); expect(it.noun).toBe('panda');
   registerFigure('g:panda', { band: 'ground', size: 140, layer: 2, main: 'white', draw: () => [S(circ(50, 60, 30), P.white), S(circ(50, 30, 15), P.white)] });
+  // "casa sobre <pendiente>": la casa queda encima de la caja del pendiente
+  const casa = s.items.find(i => i.key === 'casa');
+  expect(casa.x).toBe(it.x); expect(casa.layer).toBe(it.layer + 0.5);
+  expect(casa.base).toBeCloseTo(it.base - 100 * it.s + 6 * it.s);
   const x = it.x; s.resolvePending([id], 'g:panda');
   expect(it.pending).toBe(false); expect(it.key).toBe('g:panda'); expect(it.x).toBe(x);
+  // tras sustituirlo, la casa se re-ancla sobre la figura real (más alta)
+  expect(casa.x).toBe(it.x); expect(casa.layer).toBe(it.layer + 0.5);
+  expect(casa.base).toBeCloseTo(it.base - 100 * it.s + 6 * it.s);
 });
 test('color tras un pendiente y plural', () => {
   const s = new Scene();
@@ -95,4 +102,60 @@ test('el límite de 18 elementos móviles cuenta los pendientes', () => {
 test('handle ignora tipos desconocidos (unk no crea nada)', () => {
   const s = new Scene(); s.handle({ kind: 'unk', word: 'panda', plural: false, pos: 0 }); s.handle({ kind: 'zzz' });
   expect(s.items).toHaveLength(0);
+});
+
+// --- ronda de correcciones 1 ---
+const PANDA = { band: 'ground', size: 140, layer: 2, main: 'white', draw: () => [S(circ(50, 60, 30), P.white), S(circ(50, 30, 15), P.white)] };
+test('"<pendiente> sobre la casa": la relación sobrevive a la sustitución', () => {
+  registerFigure('g:panda', PANDA);
+  const s = new Scene(); s.handle({ kind: 'noun', key: 'casa' }); const casa = s.last;
+  const [id] = s.addPending('panda', { plural: false }); const it = s.items.find(i => i.id === id);
+  s.handle({ kind: 'prep', key: 'sobre' }); s.handle({ kind: 'art' }); s.handle({ kind: 'noun', key: 'casa' });
+  const top = casa.base - 100 * casa.s;
+  expect(it.x).toBe(casa.x); expect(it.layer).toBe(casa.layer + 0.5); expect(it.base).toBeCloseTo(top + 6 * casa.s);
+  s.resolvePending([id], 'g:panda');
+  expect(it.key).toBe('g:panda'); expect(it.x).toBe(casa.x); expect(it.layer).toBe(casa.layer + 0.5); expect(it.base).toBeCloseTo(top + 6 * casa.s);
+});
+test('destino "grande": el sujeto se re-ancla a la escala pedida, sin reiniciar su trazo', () => {
+  registerFigure('g:panda', PANDA);
+  const s = new Scene(); let t = 1000; vi.spyOn(performance, 'now').mockImplementation(() => t);
+  s.handle({ kind: 'noun', key: 'gato' }); const gato = s.last;
+  s.handle({ kind: 'prep', key: 'sobre' });
+  const [id] = s.addPending('panda', { plural: false }); const it = s.items.find(i => i.id === id);
+  s.handle({ kind: 'adj', scale: 2 }); // "…sobre un panda grande"
+  const bornGato = gato.born; t = 4000; s.resolvePending([id], 'g:panda');
+  expect(it.s).toBeGreaterThan(2.4);
+  expect(gato.x).toBe(it.x); expect(gato.base).toBeCloseTo(it.base - 100 * it.s + 6 * it.s); expect(gato.born).toBe(bornGato);
+});
+test('"dentro" no vuelve a encoger al sujeto al re-anclar', () => {
+  const s = new Scene(); s.handle({ kind: 'noun', key: 'gato' }); const gato = s.last;
+  s.handle({ kind: 'prep', key: 'dentro' });
+  const [id] = s.addPending('cueva', { plural: false }); const sGato = gato.s;
+  s.resolvePending([id], 'casa'); expect(gato.s).toBe(sGato); expect(gato.x).toBe(s.items.find(i => i.id === id).x);
+});
+test('"junto": el sujeto conserva su lado al re-anclar', () => {
+  const s = new Scene(); s.handle({ kind: 'noun', key: 'gato' }); const gato = s.last;
+  s.handle({ kind: 'prep', key: 'junto' });
+  const [id] = s.addPending('roca', { plural: false }); const it = s.items.find(i => i.id === id);
+  const side = Math.sign(gato.x - it.x); s.resolvePending([id], 'castillo');
+  expect(Math.sign(gato.x - it.x)).toBe(side); expect(Math.abs(gato.x - it.x)).toBeCloseTo((gato.half + it.half) * 0.95);
+});
+test('resolver con una figura fija o inexistente descarta el pendiente', () => {
+  const s = new Scene(); const [a] = s.addPending('ola', { plural: false }); const [b] = s.addPending('nada', { plural: false });
+  s.resolvePending([a], 'mar'); s.resolvePending([b], 'g:noexiste');
+  for (const id of [a, b]) { const it = s.items.find(i => i.id === id); expect(it.pending).toBe(true); expect(it.fadeAt).toBeDefined(); }
+});
+test('una figura de suelo muy alta no se empuja bajo la línea del suelo', () => {
+  registerFigure('g:torre', { band: 'ground', size: 400, layer: 0, main: 'none', draw: () => [S(circ(50, 50, 40), P.grey), S(circ(50, 20, 10), P.grey)] });
+  const s = new Scene(); s.handle({ kind: 'adj', scale: 2.1 });
+  const [id] = s.addPending('torre', { plural: false }); s.resolvePending([id], 'g:torre');
+  expect(s.items.find(i => i.id === id).base).toBe(GROUND);
+});
+test('drawItem: el garabato de espera no se pinta antes de 250 ms y sí después', () => {
+  const s = new Scene(); let t = 1000; vi.spyOn(performance, 'now').mockImplementation(() => t);
+  const [id] = s.addPending('panda', { plural: false }); const it = s.items.find(i => i.id === id);
+  let strokes = 0; const noop = () => {};
+  const ctx = { beginPath: noop, moveTo: noop, lineTo: noop, closePath: noop, fill: noop, stroke: () => strokes++ };
+  s.drawItem(ctx, it, it.born + 200, '#000'); expect(strokes).toBe(0);
+  s.drawItem(ctx, it, it.born + 400, '#000'); expect(strokes).toBeGreaterThan(0);
 });
