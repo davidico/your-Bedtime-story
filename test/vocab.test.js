@@ -32,10 +32,26 @@ test('detalles: pos, singular, art, gran, tablas', () => {
 });
 test('colores ambiguos y comparaciones', () => {
   expect(kinds('un pez naranja')).toEqual(['noun:pez', 'color:orange']);
-  expect(kinds('una naranja')).toEqual([]);
+  expect(kinds('una naranja')).toEqual(['unk:naranja']);
+  expect(kinds('un chocolate')).toEqual(['unk:chocolate']);
+  expect(kinds('una fresa')).toEqual(['unk:fresa']);
+  expect(kinds('un limón')).toEqual(['unk:limon']);
+  expect(kinds('naranja')).toEqual([]);
+  expect(kinds('una vaca de color naranja')).toEqual(['unk:vaca', 'color:orange']);
+  expect(kinds('una rosa')).toEqual(['noun:flor']);
+  expect(kinds('un gato rosa')).toEqual(['noun:gato', 'color:pink']);
   expect(kinds('un tomate')).toEqual(['unk:tomate']);
   expect(kinds('un gato tomate')).toEqual(['noun:gato']);
   expect(kinds('unas rosas')).toEqual(['noun:flor']);
   expect(kinds('una vaca azul')).toEqual(['unk:vaca', 'color:blue']);
-  expect(kinds('el cielo')).toEqual(['art:']);
+  expect(kinds('el cielo')).toEqual(['art:', 'unk:cielo']);
+});
+test('el determinante sobrevive a colores y adjetivos de STOP', () => {
+  expect(kinds('un rojo dinosaurio')).toEqual(['color:red', 'unk:dinosaurio']);
+  expect(kinds('una nueva amiga')).toEqual(['noun:nina']);
+  expect(kinds('una nueva jirafa')).toEqual(['unk:jirafa']);
+  expect(kinds('un buen amigo')).toEqual(['noun:nino']);
+  expect(kinds('unos viejos piratas')).toEqual(['unk:piratas']);
+  expect(kinds('unos grandes dinosaurios')).toEqual(['unk:dinosaurios']);
+  expect(kinds('un rato rojo')).toEqual(['color:red']);
 });
