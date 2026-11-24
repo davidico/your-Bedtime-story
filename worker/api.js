@@ -38,8 +38,12 @@ async function readFig(kv, key) {
 // Guarda la figura bajo su canónico; los negativos caducan a los 30 días, los positivos no.
 const putFig = (kv, f) => safePut(kv, figureKey(f.canonical), JSON.stringify(f), f.status === 'ok' || f.status === 'builtin' ? undefined : { expirationTtl: NEG_TTL });
 
-/** Atiende /api/*. `deps.generate(word)` devuelve la salida cruda del modelo (o null). */
-export async function handleApi(request, env, { generate }) {
+// Clave de FIG hecha a mano para un canónico del modelo ('Árbol', 'perros' → 'arbol', 'perro'), o null.
+const builtinOf = c => [plain(c), normalizeConcept(c)].find(isBuiltinKey) || null;
+
+/** Atiende /api/*. `deps.generate(word)` devuelve la salida cruda del modelo (o null).
+ *  `ctx.waitUntil` (opcional) deja terminar generación y guardado aunque el navegador ya se haya ido (aborta a los 8 s). */
+export async function handleApi(request, env, { generate }, ctx) {
   if (request.method !== 'POST') return json({ status: 'error' }, 405, { Allow: 'POST' });
   if (new URL(request.url).pathname !== '/api/figure') return json({ status: 'error' }, 404);
   // 2. Origen permitido (si hay lista).
@@ -87,24 +91,40 @@ export async function handleApi(request, env, { generate }) {
   // Contador aproximado: leer y escribir no es atómico (spec §5.9); dos peticiones a la vez pueden contar una.
   try { await kv.put(countKey, String(count + 1), { expirationTtl: COUNT_TTL }); }
   catch { return json({ status: 'error' }, 503, { 'Retry-After': '60' }); }
+  // 10–12. Generar, sanear y guardar; bajo waitUntil, para que una figura lenta ya pagada quede en caché.
+  const work = generateAndStore(kv, concept, word, generate);
+  if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(work.catch(() => {}));
+  const fig = await work;
+  if (!fig) return json({ status: 'error' }, 502);
+  // 13. Respuesta.
+  return reply(fig);
+}
+
+async function generateAndStore(kv, concept, word, generate) {
   // 10. Generar y sanear. La llamada ya cuenta para el tope aunque falle (ya ha costado).
   let fig = null;
   try { fig = sanitizeFigure(await generate(word)); } catch { fig = null; }
-  if (fig && fig.status === 'builtin') { if (!isBuiltinKey(fig.canonical)) fig = null; }
-  else if (fig) {
+  if (!fig) return null;
+  const own = fig.status === 'ok' || fig.status === 'builtin' ? builtinOf(fig.canonical) : null;
+  if (own) fig = { ...fig, status: 'builtin', canonical: own, main: 'none', prims: [] }; // nunca una 2.ª versión de una figura de mano (A4)
+  else if (fig.status === 'builtin') return null; // builtin con una clave que no es de FIG
+  else if (fig.status === 'ok') {
     // El canónico del modelo se normaliza como un concepto; si no vale, se usa el pedido.
     const c = normalizeConcept(fig.canonical);
     fig = { ...fig, canonical: isValidConcept(c) ? c : concept };
-    if (fig.status === 'ok' && isBlocked(fig.canonical)) fig = { ...negative(fig.canonical) };
-  }
-  if (!fig) return json({ status: 'error' }, 502);
-  // 11. Guardar bajo el canónico; si ya había figura ahí, manda la guardada (las figuras no se regeneran).
+    if (isBlocked(fig.canonical)) fig = negative(concept);
+  } else fig = { ...fig, canonical: concept }; // negativos: solo bajo lo pedido, nunca tapan otra palabra
+  // 11. Positivo con otro canónico: se guarda bajo el canónico (si ya había figura, manda la guardada: no se regeneran)
+  // y 12. alias del pedido al canónico. Un negativo ajeno bajo el canónico no se sirve: la figura queda solo bajo lo pedido.
   if (fig.canonical !== concept) {
     const existing = await readFig(kv, figureKey(fig.canonical));
-    if (existing) fig = existing; else await putFig(kv, fig);
-    // 12. Alias del pedido al canónico.
-    await safePut(kv, aliasKey(concept), fig.canonical);
-  } else await putFig(kv, fig);
-  // 13. Respuesta.
-  return reply(fig);
+    if (existing && existing.status !== 'ok' && existing.status !== 'builtin') fig = { ...fig, canonical: concept };
+    else {
+      if (existing) fig = existing; else await putFig(kv, fig);
+      await safePut(kv, aliasKey(concept), fig.canonical);
+      return fig;
+    }
+  }
+  await putFig(kv, fig);
+  return fig;
 }

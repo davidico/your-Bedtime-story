@@ -11,9 +11,9 @@ let claudeGenerate;
 const generateWithClaude = (env, word) =>
   (claudeGenerate ??= createFigureGenerator({ client: new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, timeout: 10_000, maxRetries: 0 }) }))(word);
 
-async function fetch(request, env) {
+async function fetch(request, env, ctx) {
   if (new URL(request.url).pathname.startsWith('/api/')) {
-    return handleApi(request, env, { generate: env.MOCK_AI === '1' ? mockGenerateFigure : word => generateWithClaude(env, word) });
+    return handleApi(request, env, { generate: env.MOCK_AI === '1' ? mockGenerateFigure : word => generateWithClaude(env, word) }, ctx);
   }
   return env.ASSETS.fetch(request);
 }

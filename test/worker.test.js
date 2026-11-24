@@ -225,3 +225,50 @@ test('index: /api/ va a handleApi con el simulado; lo demás a ASSETS; rutas /ap
   expect(assets).toEqual(['/index.html']);
   expect((await worker.fetch(new Request('https://x/api/otra', { method: 'POST' }), env)).status).toBe(404);
 });
+
+// --- revisión final ---
+test('negativos del modelo: siempre bajo el concepto pedido, sin alias (no tapan otra palabra)', async () => {
+  const otro = makeDeps(async () => ({ ...(await mockGenerateFigure('gato')), status: 'not_drawable', prims: [] }));
+  expect(await (await handleApi(req({ concept: 'mesa' }), env, otro)).json()).toEqual({ status: 'not_drawable', key: 'mesa' });
+  expect(env.FIGURES.opts.get('fig:v1:mesa')).toEqual({ expirationTtl: 2592000 });
+  expect(env.FIGURES.map.has('fig:v1:gato')).toBe(false); expect(env.FIGURES.map.has('alias:v1:mesa')).toBe(false);
+  // rechazo del modelo (figure-ai devuelve blocked con la palabra como canónico): igual, bajo el concepto
+  const rechazo = makeDeps(async () => ({ status: 'blocked', canonical: 'tigres', band: 'ground', size: 100, layer: 2, main: 'none', prims: [] }));
+  expect(await (await handleApi(req({ concept: 'tigr', word: 'tigres' }), env, rechazo)).json()).toEqual({ status: 'blocked', key: 'tigr' });
+  expect(env.FIGURES.map.has('fig:v1:tigres')).toBe(false); expect(env.FIGURES.map.has('alias:v1:tigr')).toBe(false);
+  // ok cuyo canónico está en la lista negra → negativo bajo el concepto, sin alias
+  const malo = makeDeps(async () => mockGenerateFigure('pistola'));
+  expect(await (await handleApi(req({ concept: 'juguete' }), env, malo)).json()).toEqual({ status: 'blocked', key: 'juguete' });
+  expect(env.FIGURES.map.has('alias:v1:juguete')).toBe(false); expect(env.FIGURES.map.has('fig:v1:pistola')).toBe(false);
+  // un negativo ajeno guardado bajo el canónico no se sirve para otra palabra
+  await env.FIGURES.put('fig:v1:nutria', JSON.stringify({ status: 'not_drawable', canonical: 'nutria', band: 'ground', size: 120, layer: 1, main: 'none', prims: [] }));
+  const nutria = makeDeps(async () => mockGenerateFigure('nutria'));
+  expect(await (await handleApi(req({ concept: 'nutriita' }), env, nutria)).json()).toMatchObject({ status: 'ok', key: 'nutriita' });
+  expect(JSON.parse(env.FIGURES.map.get('fig:v1:nutriita')).status).toBe('ok'); expect(env.FIGURES.map.has('alias:v1:nutriita')).toBe(false);
+});
+test('ok o builtin con canónico de una figura hecha a mano → builtin; con tildes también', async () => {
+  for (const [concept, canonical, key] of [['perrazo', 'perro', 'perro'], ['perrote', 'Perros', 'perro'], ['arbolito', 'árbol', 'arbol']]) {
+    const g = makeDeps(async () => ({ ...(await mockGenerateFigure('x')), canonical }));
+    expect(await (await handleApi(req({ concept }), env, g)).json()).toEqual({ status: 'builtin', key });
+    expect(env.FIGURES.map.get(`alias:v1:${concept}`)).toBe(key);
+  }
+  const b = makeDeps(async () => ({ status: 'builtin', canonical: 'Árbol', band: 'ground', size: 100, layer: 1, main: 'none', prims: [] }));
+  expect((await handleApi(req({ concept: 'arbolazo' }), env, b)).status).toBe(200);
+  expect(JSON.parse(env.FIGURES.map.get('fig:v1:arbol')).prims).toEqual([]);
+});
+test('ctx.waitUntil: la generación se guarda aunque el navegador se haya ido', async () => {
+  const waits = []; const ctx = { waitUntil: p => waits.push(p) };
+  let release; const slow = makeDeps(() => new Promise(r => { release = () => r(mockGenerateFigure('koala')); }));
+  const pending = handleApi(req({ concept: 'koala' }), env, slow, ctx);
+  await vi.waitFor(() => expect(waits).toHaveLength(1));
+  release(); await waits[0];
+  expect(env.FIGURES.map.has('fig:v1:koala')).toBe(true);
+  expect((await (await pending).json()).status).toBe('ok');
+  // sin ctx (pruebas, scripts) sigue funcionando
+  expect((await handleApi(req({ concept: 'koala' }), env, slow)).status).toBe(200);
+});
+test('index: pasa ctx a handleApi', async () => {
+  env.MOCK_AI = '1'; const waits = [];
+  const r = await worker.fetch(req({ concept: 'lemur' }), env, { waitUntil: p => waits.push(p) });
+  expect(r.status).toBe(200); expect(waits).toHaveLength(1);
+});
