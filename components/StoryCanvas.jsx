@@ -29,7 +29,7 @@ export default function StoryCanvas() {
   const demoRef = useRef(null);
   const [words, setWords] = useState([]);   // subtítulos confirmados
   const [interim, setInterim] = useState('');
-  const [code, setCodeState] = useState('');  // código de familia guardado ('' = modo local)
+  const [codeStatus, setCodeStatus] = useState('none'); // código de familia: 'none' | 'ok' | 'rejected' (solo lo ve el adulto)
 
   if (!sceneRef.current) sceneRef.current = new Scene();
   const directorRef = useRef(null), aiRef = useRef(null);
@@ -50,18 +50,20 @@ export default function StoryCanvas() {
   // bucle de dibujo
   useEffect(() => {
     const ctx = canvasRef.current.getContext('2d');
-    // enlace /?codigo=…: se guarda el código y se quita de la URL (que no quede en el historial ni al compartir)
+    // enlace /?codigo=…: se guarda el código y se quita de la URL (que no quede en el historial ni al compartir);
+    // un ?codigo= vacío no borra el código bueno que ya hubiera
     const ai = aiRef.current, url = new URL(window.location.href), fromUrl = url.searchParams.get('codigo');
+    const unsubscribe = ai.subscribe(setCodeStatus);
     if (fromUrl !== null) {
-      ai.setCode(fromUrl);
+      if (fromUrl.trim()) ai.setCode(fromUrl);
       url.searchParams.delete('codigo');
       window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
     }
-    setCodeState(ai.getCode());
+    setCodeStatus(ai.codeStatus());
     let raf; const loop = now => { sceneRef.current.frame(ctx, now); raf = requestAnimationFrame(loop); };
     raf = requestAnimationFrame(loop);
     tell(OPENING);
-    return () => cancelAnimationFrame(raf);
+    return () => { cancelAnimationFrame(raf); unsubscribe(); };
   }, [tell]);
 
   const clear = () => { clearTimeout(demoRef.current); sceneRef.current.clear(); setWords([]); setInterim(''); };
@@ -72,7 +74,7 @@ export default function StoryCanvas() {
   };
   const onCode = e => {
     e.preventDefault(); const i = e.target.elements.codigo;
-    aiRef.current.setCode(i.value); setCodeState(aiRef.current.getCode()); i.value = '';
+    aiRef.current.setCode(i.value); i.value = ''; // subscribe actualiza el estado
   };
   const onType = e => { e.preventDefault(); const i = e.target.elements.frase; if (i.value.trim()) { tell(i.value); i.value = ''; } };
 
@@ -89,7 +91,7 @@ export default function StoryCanvas() {
       <div className="sheet"><canvas ref={canvasRef} width={W} height={H} aria-label="Dibujo del cuento" /></div>
 
       <div className="caption" aria-live="polite">
-        {words.map((t, i) => <span key={i} className={t.kind === 'noun' ? 'k' : (t.kind === 'none' || t.kind === 'art') ? 'w' : 'c'}>{t.raw} </span>)}
+        {words.map((t, i) => <span key={i} className={t.kind === 'noun' ? 'k' : (t.kind === 'none' || t.kind === 'art' || t.kind === 'gap') ? 'w' : 'c'}>{t.raw} </span>)}
         {interim && <span className="live">{interim}</span>}
       </div>
       <div className={'status' + (status.error ? ' err' : '')}>{status.text}</div>
@@ -106,8 +108,12 @@ export default function StoryCanvas() {
         <p>Colocar: “un gato <b>sobre</b> la casa”, “una niña <b>junto a</b> un perro”, “un oso <b>dentro de</b> la casa”. Tamaño: “un dragón <b>grande</b>”, “una casita <b>pequeña</b>”.</p>
         <p>Cámara: “miro a la <b>izquierda</b>”, “<b>caminamos hacia</b> el castillo”, “<b>volvemos</b>”.</p>
         <form onSubmit={onType}><input id="frase" name="frase" placeholder="Sin micrófono: escribe una frase" autoComplete="off" /><button type="submit">Dibujar</button></form>
-        <p><b>Código de familia.</b> Con él, también dibuja palabras nuevas que no están en la lista. {code ? 'Este dispositivo ya tiene código.' : 'Sin código, dibuja solo las palabras de la lista.'}</p>
-        <form onSubmit={onCode}><input id="codigo" name="codigo" aria-label="Código de familia" placeholder={code ? 'Cambiar código (vacío para quitarlo)' : 'Código de familia'} autoComplete="off" autoCapitalize="none" spellCheck={false} /><button type="submit">Guardar</button></form>
+        <p><b>Código de familia.</b> Con él, también dibuja palabras nuevas que no están en la lista. {{
+          none: 'Sin código, dibuja solo las palabras de la lista.',
+          ok: 'Este dispositivo ya tiene código.',
+          rejected: 'El código no vale: revísalo o pide uno nuevo. Mientras, dibuja las palabras de la lista y las que ya aprendió.',
+        }[codeStatus]}</p>
+        <form onSubmit={onCode}><input id="codigo" name="codigo" aria-label="Código de familia" placeholder={codeStatus !== 'none' ? 'Cambiar código (vacío para quitarlo)' : 'Código de familia'} autoComplete="off" autoCapitalize="none" spellCheck={false} /><button type="submit">Guardar</button></form>
         <p><b>Privacidad.</b> El reconocimiento de voz lo hace el navegador: en Chrome y Safari, el audio lo procesa el servicio de voz del fabricante (Google o Apple). A la IA solo se envía la palabra que hay que dibujar. No guardamos el audio ni el cuento.</p>
       </details>
     </main>

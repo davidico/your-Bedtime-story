@@ -64,3 +64,12 @@ describe('createHolds (temporizador del retenido)', () => {
     expect(words()).toEqual(['gato', 'gato']);
   });
 });
+
+// --- revisión final ---
+test('un desconocido retenido y luego seguido de un sustantivo: el sustantivo sale igual (skip no cambia el recuento)', () => {
+  vi.useFakeTimers(); const out = []; const h = createHolds(evs => out.push(evs));
+  h.feed(0, tokens('el fierisimo'), false); vi.advanceTimersByTime(600);
+  h.feed(0, tokens('el fierisimo lobo'), true);
+  expect(out.flat().map(t => t.word ?? t.key ?? t.kind)).toEqual(['art', 'fierisimo', 'lobo']);
+  vi.useRealTimers();
+});

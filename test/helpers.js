@@ -29,11 +29,13 @@ export function memStorage(init = {}) {
 }
 
 // IA falsa para el director: responde según `answers[concepto]` (o error) y cuenta llamadas.
-export function fakeAI(answers, { enabled = true } = {}) {
+// `cached[concepto]` simula lo que ya hay en L1 (respuesta síncrona).
+export function fakeAI(answers, { enabled = true, cached = {} } = {}) {
   const asked = [];
   return {
     asked,
     enabled: () => enabled,
+    cached: concept => cached[concept] || null,
     figure: async (concept, word) => { asked.push({ concept, word }); return answers[concept] || { status: 'error' }; },
   };
 }

@@ -33,14 +33,17 @@ test('L1 persiste en storage y otra instancia la reutiliza sin red', async () =>
   expect(await ai2.figure('pandita')).toEqual({ status: 'ok', key: 'g:panda' });
   expect(off.calls).toBe(0); expect(FIG['g:panda']).toBeTruthy(); // se vuelve a registrar desde L1
 });
-test('429 pausa según Retry-After; 401 borra el código', async () => {
+test('429 pausa según Retry-After; 401 marca el código como rechazado sin borrarlo', async () => {
   let t = 0; const ai = createAI({ fetchImpl: fakeStatus(429, { 'Retry-After': '60' }), storage: memStorage({ 'ys:code': 'abc' }), now: () => t });
   expect((await ai.figure('vaca')).status).toBe('error'); expect(ai.enabled()).toBe(false);
   t = 61000; expect(ai.enabled()).toBe(true);
   const storage = memStorage({ 'ys:code': 'abc' });
   const ai2 = createAI({ fetchImpl: fakeStatus(401), storage });
   expect((await ai2.figure('vaca')).status).toBe('error');
-  expect(ai2.getCode()).toBe(''); expect(ai2.enabled()).toBe(false); expect(storage.data['ys:code']).toBeUndefined();
+  expect(ai2.getCode()).toBe('abc'); expect(ai2.enabled()).toBe(false); expect(storage.data['ys:code']).toBe('abc');
+  expect(ai2.codeStatus()).toBe('rejected');
+  ai2.setCode('otro'); expect(ai2.codeStatus()).toBe('ok'); expect(ai2.enabled()).toBe(true);
+  ai2.setCode(''); expect(ai2.codeStatus()).toBe('none');
 });
 test('negativos se cachean; error no', async () => {
   const neg = fakeFetch({ status: 'not_drawable', key: 'idea' });
@@ -123,4 +126,31 @@ test('L1 con tope de 300: sale lo más antiguo', async () => {
   for (let i = 0; i < 301; i++) await ai.figure('c' + 'abcdefghijklmnopqrstuvwxyz'[i % 26] + i);
   const l1 = JSON.parse(storage.data['ys:fig:v1']);
   expect(Object.keys(l1)).toHaveLength(300); expect(l1.ca0).toBeUndefined(); expect(l1.ca300).toBeUndefined();
+});
+
+// --- revisión final ---
+test('cached: síncrono, sin red; sirve L1 aunque no haya código', async () => {
+  const storage = memStorage({ 'ys:code': 'abc' });
+  const { fetchImpl } = fakeFetch({ status: 'not_drawable', key: 'idea' });
+  await createAI({ fetchImpl, storage }).figure('idea');
+  const f = fakeStatus(500); const ai = createAI({ fetchImpl: f, storage }); ai.setCode('');
+  expect(ai.cached('idea')).toEqual({ status: 'not_drawable' }); expect(ai.cached('vaca')).toBeNull();
+  expect(await ai.figure('idea')).toEqual({ status: 'not_drawable' }); expect(f.calls).toBe(0);
+});
+test('ok con canónico de una figura hecha a mano → builtin, sin registrar g:', async () => {
+  for (const canonical of ['perro', 'perros', 'Árbol']) {
+    const { fetchImpl } = fakeFetch({ status: 'ok', key: canonical, figure: { ...PANDA, canonical } });
+    const ai = createAI({ fetchImpl, storage: memStorage({ 'ys:code': 'abc' }) });
+    expect(await ai.figure('cosa')).toEqual({ status: 'builtin', key: canonical === 'Árbol' ? 'arbol' : 'perro' });
+  }
+  expect(FIG['g:perro']).toBeUndefined(); expect(FIG['g:perros']).toBeUndefined();
+  const ai = createAI({ fetchImpl: fakeFetch({ status: 'builtin', key: 'árbol' }).fetchImpl, storage: memStorage({ 'ys:code': 'abc' }) });
+  expect(await ai.figure('arbolote')).toEqual({ status: 'builtin', key: 'arbol' });
+});
+test('subscribe avisa del rechazo una vez y de los cambios de código', async () => {
+  const ai = createAI({ fetchImpl: fakeStatus(401), storage: memStorage({ 'ys:code': 'abc' }) }); const seen = [];
+  const off = ai.subscribe(s => seen.push(s));
+  await ai.figure('vaca'); expect(await ai.figure('oso')).toEqual({ status: 'error' });
+  ai.setCode('nuevo'); off(); ai.setCode('');
+  expect(seen).toEqual(['rejected', 'ok']);
 });
