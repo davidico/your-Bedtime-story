@@ -358,10 +358,9 @@ Cuentas y sustitución del código de familia; pagos y cuotas por familia; web a
 - Si la validación de la salida usa Zod (`zodOutputFormat` + `client.messages.parse`) o JSON Schema a mano; en ambos casos los rangos se validan en nuestro saneado.
 - Ajustes de interfaz para el código de familia y el aviso de privacidad.
 
-## 9. Preguntas abiertas para la dueña
+## 9. Respuestas de la dueña (24-11-2026)
 
-Se puede empezar sin respuesta; entre paréntesis, lo que se construye por defecto.
-
-1. **¿Deben recordarse los personajes con nombre de un cuento a otro en el mismo dispositivo?** ("Toby" es el perro marrón también mañana.) (Por defecto: no; se olvidan con "Hoja nueva". Si la respuesta es sí, se guarda la ficha en el dispositivo, nunca en servidor.)
-2. **¿Dónde está el límite de lo que se puede dibujar?** (Por defecto: monstruos, brujas, fantasmas, piratas y espadas de cuento sí, siempre con aspecto amable; armas de fuego, sangre, alcohol/tabaco y personas reales no.)
-3. **¿Vale el "código de familia" para compartir la app con otras familias al principio, y qué gasto mensual máximo aceptas?** (Por defecto: sí, un código por familia que tú repartes y puedes revocar; tope de 10 $ al mes. Si prefieres web abierta sin código, hay que añadir protección anti-bots antes de publicarla.)
+1. **Personajes entre cuentos: SÍ.** La ficha de cada personaje con nombre (figura, tinte, detalle, semilla) se guarda en el dispositivo (`localStorage`), nunca en el servidor. "Hoja nueva" borra la escena pero no los personajes; habrá una opción aparte para olvidarlos.
+2. **Límite de contenido: el propuesto.** Monstruos, brujas, fantasmas, piratas y espadas de cuento sí, siempre amables. Armas de fuego, sangre, alcohol, tabaco y personas reales no.
+3. **Código de familia: SÍ.** Uno por familia, revocable. **Tope de gasto: 10 $ al mes** (límite en la consola de Anthropic más tope diario en el Worker).
+4. **Cuentas:** la dueña tiene cuenta de Cloudflare y clave de la API de Anthropic. Como no se sabe si el plan de Cloudflare es gratis o de pago, el diseño debe funcionar en el plan gratis: KV solo cuenta y guarda **generaciones de figura** (no las llamadas a `understand`), y el rate limit de las llamadas a `understand` usa el binding de rate limit o memoria del isolate. Todo se construye y prueba primero con `MOCK_AI=1`; la medición real (latencia, caché de prompts, hoja de contacto) se hace cuando la clave esté configurada en el entorno.
