@@ -154,3 +154,10 @@ test('subscribe avisa del rechazo una vez y de los cambios de código', async ()
   ai.setCode('nuevo'); off(); ai.setCode('');
   expect(seen).toEqual(['rejected', 'ok']);
 });
+test('un 401 de una petición hecha con un código anterior no rechaza el nuevo', async () => {
+  let answer; const fetchImpl = () => new Promise(r => { answer = r; });
+  const ai = createAI({ fetchImpl, storage: memStorage({ 'ys:code': 'viejo' }) });
+  const p = ai.figure('vaca'); await Promise.resolve();
+  ai.setCode('nuevo'); answer(new Response(null, { status: 401 })); await p;
+  expect(ai.codeStatus()).toBe('ok'); expect(ai.enabled()).toBe(true);
+});

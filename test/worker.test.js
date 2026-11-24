@@ -272,3 +272,10 @@ test('index: pasa ctx a handleApi', async () => {
   const r = await worker.fetch(req({ concept: 'lemur' }), env, { waitUntil: p => waits.push(p) });
   expect(r.status).toBe(200); expect(waits).toHaveLength(1);
 });
+test('un negativo viejo bajo una clave hecha a mano no estropea el builtin', async () => {
+  await env.FIGURES.put('fig:v1:perro', JSON.stringify({ status: 'not_drawable', canonical: 'perro', band: 'ground', size: 120, layer: 1, main: 'none', prims: [] }));
+  const g = makeDeps(async () => ({ ...(await mockGenerateFigure('x')), canonical: 'perro' }));
+  expect(await (await handleApi(req({ concept: 'perrazo' }), env, g)).json()).toEqual({ status: 'builtin', key: 'perro' });
+  expect(await (await handleApi(req({ concept: 'perrazo' }), env, g)).json()).toEqual({ status: 'builtin', key: 'perro' });
+  expect(g.generated()).toBe(1);
+});

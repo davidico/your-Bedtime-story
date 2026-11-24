@@ -116,6 +116,9 @@ async function generateAndStore(kv, concept, word, generate) {
   } else fig = { ...fig, canonical: concept }; // negativos: solo bajo lo pedido, nunca tapan otra palabra
   // 11. Positivo con otro canónico: se guarda bajo el canónico (si ya había figura, manda la guardada: no se regeneran)
   // y 12. alias del pedido al canónico. Un negativo ajeno bajo el canónico no se sirve: la figura queda solo bajo lo pedido.
+  if (fig.canonical !== concept && own) { // builtin: siempre bajo su clave de FIG (pisa un negativo viejo sin sentido)
+    await putFig(kv, fig); await safePut(kv, aliasKey(concept), fig.canonical); return fig;
+  }
   if (fig.canonical !== concept) {
     const existing = await readFig(kv, figureKey(fig.canonical));
     if (existing && existing.status !== 'ok' && existing.status !== 'builtin') fig = { ...fig, canonical: concept };

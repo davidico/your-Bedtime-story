@@ -10,7 +10,7 @@ const BLOB = { band: 'ground', size: 160, layer: 2, main: 'grey', draw: () => [S
 // Monta escena + director; say() reparte una frase como hace la app (sin los 'none').
 function setup(ai) {
   const scene = new Scene(), d = createDirector({ scene, ai });
-  return { scene, say: text => d.onEvents(tokens(text).filter(t => t.kind !== 'none')), keys: k => scene.items.filter(i => i.key === k && !i.fadeAt) };
+  return { scene, say: text => d.onEvents(tokens(text).filter(t => t.kind !== 'none' || t.gap)), keys: k => scene.items.filter(i => i.key === k && !i.fadeAt) };
 }
 
 describe('I1: un desconocido entre determinante y sustantivo conocido no se come el estado', () => {
@@ -19,8 +19,8 @@ describe('I1: un desconocido entre determinante y sustantivo conocido no se come
     say('un lobo'); say('el feroz lobo'); await flush();
     expect(keys('lobo')).toHaveLength(1); expect(ai.asked).toHaveLength(0);
   });
-  test('desconocido justo antes de un sustantivo conocido: se salta sin pedir nada', async () => {
-    const ai = fakeAI({}); const { scene, say, keys } = setup(ai);
+  test('negativo ya conocido (L1) delante de un sustantivo: no se pide ni consume el determinante', async () => {
+    const ai = fakeAI({}, { cached: { fierisimo: { status: 'not_drawable' } } }); const { scene, say, keys } = setup(ai);
     say('un lobo'); say('el fierisimo lobo'); await flush();
     expect(keys('lobo')).toHaveLength(1); expect(ai.asked).toHaveLength(0);
     expect(scene.items.some(i => i.pending)).toBe(false);
@@ -121,4 +121,44 @@ test('M3: modo local, "un gato miraba el cielo azul" no tiñe al gato', () => {
 test('M3: con IA, "el cielo" no se pide (STOP) y no tiñe al gato', () => {
   const ai = fakeAI({}); const { say, keys } = setup(ai);
   say('un gato miraba el cielo azul'); expect(ai.asked).toHaveLength(0); expect(keys('gato')[0].tint).toBeNull();
+});
+
+// --- regresiones de la ronda de correcciones: por la cadena de voz real (tokens → createHolds → director → Scene) ---
+import { createHolds } from '@/lib/partials';
+function voice(ai) {
+  const scene = new Scene(), d = createDirector({ scene, ai }), sent = [];
+  const holds = createHolds(evs => { sent.push(...evs); d.onEvents(evs); });
+  return { scene, sent, feed: (i, text, final) => holds.feed(i, tokens(text), final), keys: k => scene.items.filter(i => i.key === k && !i.fadeAt) };
+}
+describe('parciales reescritos tras una palabra de STOP', () => {
+  test('"una cosa" → "una casa": la casa se dibuja (modo local)', () => {
+    const v = voice(fakeAI({}, { enabled: false }));
+    v.feed(0, 'una cosa', false); v.feed(0, 'una casa', true);
+    expect(v.keys('casa')).toHaveLength(1);
+  });
+  test('"un rato" → "un ratón" y "una mes" → "una mesa": el desconocido se pide', () => {
+    const ai = fakeAI({}); const v = voice(ai);
+    v.feed(0, 'un rato', false); v.feed(0, 'un ratón', true);
+    v.feed(1, 'una mes', false); v.feed(1, 'una mesa', true);
+    expect(ai.asked.map(a => a.concept)).toEqual(['raton', 'mesa']);
+  });
+  test('modo local: lo que llega al director son los mismos eventos de antes (más avisos gap que no cuentan)', () => {
+    const v = voice(fakeAI({}, { enabled: false }));
+    v.feed(0, 'había una vez', false); v.feed(0, 'había una vez un gato', true);
+    expect(v.sent.filter(e => e.kind !== 'none').map(e => e.key)).toEqual(['gato']);
+    expect(v.sent.filter(e => e.kind === 'none').every(e => e.gap)).toBe(true);
+  });
+  test('"el cielo azul" por voz no tiñe al gato', () => {
+    const v = voice(fakeAI({}, { enabled: false }));
+    v.feed(0, 'un gato miraba el cielo', false); v.feed(0, 'un gato miraba el cielo azul', true);
+    expect(v.keys('gato')[0].tint).toBeNull();
+  });
+});
+describe('un sustantivo desconocido delante de uno conocido (aposición) se pide', () => {
+  for (const [text, concept] of [['un elefante bebé', 'elefante'], ['la jirafa mamá', 'jirafa'], ['el sapo príncipe', 'sapo'], ['unos piratas, barcos y peces', 'pirata']]) {
+    test(text, () => {
+      const ai = fakeAI({}); const v = voice(ai); v.feed(0, text, true);
+      expect(ai.asked.map(a => a.concept)).toContain(concept);
+    });
+  }
 });

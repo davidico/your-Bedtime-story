@@ -43,7 +43,7 @@ export default function StoryCanvas() {
     if (finalText) setWords(w => w.concat(tokens(finalText)).slice(-14));
     setInterim(live);
   }, []);
-  const tell = useCallback(text => { onCaption(text, ''); onEvents(tokens(text).filter(t => t.kind !== 'none')); }, [onCaption, onEvents]);
+  const tell = useCallback(text => { onCaption(text, ''); onEvents(tokens(text).filter(t => t.kind !== 'none' || t.gap)); }, [onCaption, onEvents]);
 
   const { listening, supported, status, toggle } = useSpeech({ tokenize: tokens, onEvents, onCaption });
 
@@ -91,7 +91,7 @@ export default function StoryCanvas() {
       <div className="sheet"><canvas ref={canvasRef} width={W} height={H} aria-label="Dibujo del cuento" /></div>
 
       <div className="caption" aria-live="polite">
-        {words.map((t, i) => <span key={i} className={t.kind === 'noun' ? 'k' : (t.kind === 'none' || t.kind === 'art' || t.kind === 'gap') ? 'w' : 'c'}>{t.raw} </span>)}
+        {words.map((t, i) => <span key={i} className={t.kind === 'noun' ? 'k' : (t.kind === 'none' || t.kind === 'art') ? 'w' : 'c'}>{t.raw} </span>)}
         {interim && <span className="live">{interim}</span>}
       </div>
       <div className={'status' + (status.error ? ' err' : '')}>{status.text}</div>

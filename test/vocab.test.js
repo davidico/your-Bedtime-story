@@ -2,10 +2,10 @@ import { tokens, ADJ, COLORS, DETS, STOP } from '@/lib/vocab';
 import { PALETTE_KEYS } from '@/lib/figures';
 const kinds = t => tokens(t).filter(x => x.kind !== 'none').map(x => x.kind + ':' + (x.word ?? x.key ?? ''));
 test('sustantivo desconocido tras determinante', () => {
-  expect(kinds('había una vez un panda')).toEqual(['gap:', 'unk:panda']);
+  expect(kinds('había una vez un panda')).toEqual(['unk:panda']);
   expect(kinds('un gran dinosaurio')).toContain('unk:dinosaurio');
   expect(tokens('unos dinosaurios').find(t => t.kind === 'unk')).toMatchObject({ word: 'dinosaurios', plural: true });
-  expect(kinds('un rato después')).toEqual(['gap:']);
+  expect(kinds('un rato después')).toEqual([]);
   expect(kinds('un gato')).toEqual(['noun:gato']);
   expect(kinds('el panda').at(-1)).toBe('unk:panda');
 });
@@ -25,7 +25,7 @@ test('detalles: pos, singular, art, gran, tablas', () => {
   expect(kinds('un panda')).toEqual(['unk:panda']);
   expect(kinds('panda')).toEqual([]); // sin determinante no hay unk
   expect(kinds('un oso')).toEqual(['noun:oso']);
-  expect(kinds('al final')).toEqual(['art:', 'gap:']);
+  expect(kinds('al final')).toEqual(['art:']);
   expect(kinds('un ratón')).toEqual(['unk:raton']);
   for (const v of Object.values(COLORS)) expect(PALETTE_KEYS).toContain(v);
   expect(DETS.has('unos')).toBe(true); expect(STOP.has('vez')).toBe(true);
@@ -44,7 +44,8 @@ test('colores ambiguos y comparaciones', () => {
   expect(kinds('un gato tomate')).toEqual(['noun:gato']);
   expect(kinds('unas rosas')).toEqual(['noun:flor']);
   expect(kinds('una vaca azul')).toEqual(['unk:vaca', 'color:blue']);
-  expect(kinds('el cielo')).toEqual(['art:', 'gap:']); // STOP: no dibujable
+  expect(kinds('el cielo')).toEqual(['art:']); // STOP: no dibujable
+  expect(tokens('el cielo')[1]).toMatchObject({ kind: 'none', gap: true }); expect(tokens('cielo')[0].gap).toBeUndefined();
 });
 test('el determinante sobrevive a colores y adjetivos de STOP', () => {
   expect(kinds('un rojo dinosaurio')).toEqual(['color:red', 'unk:dinosaurio']);
@@ -53,7 +54,7 @@ test('el determinante sobrevive a colores y adjetivos de STOP', () => {
   expect(kinds('un buen amigo')).toEqual(['noun:nino']);
   expect(kinds('unos viejos piratas')).toEqual(['unk:piratas']);
   expect(kinds('unos grandes dinosaurios')).toEqual(['unk:dinosaurios']);
-  expect(kinds('un rato rojo')).toEqual(['gap:', 'color:red']);
+  expect(kinds('un rato rojo')).toEqual(['color:red']);
 });
 
 // --- revisión final ---
@@ -63,12 +64,6 @@ test('adjetivos de cuento delante del sustantivo no son figura y mantienen el de
   expect(kinds('los feroces lobos')).toEqual(['art:', 'noun:lobo']);
   expect(kinds('una linda jirafa')).toEqual(['unk:jirafa']);
   expect(kinds('unos jóvenes piratas')).toEqual(['unk:piratas']);
-});
-test('desconocido justo antes de un sustantivo conocido: skip, sin cambiar de tipo', () => {
-  const t = tokens('el fierisimo lobo');
-  expect(t.map(x => x.kind)).toEqual(['art', 'unk', 'noun']); expect(t[1].skip).toBe(true);
-  expect(tokens('un fierisimo').at(-1).skip).toBeUndefined();
-  expect(tokens('una jirafa roja')[1].skip).toBeUndefined();
 });
 test('plural solo si el singular cambia', () => {
   expect(tokens('un autobús')[1]).toMatchObject({ kind: 'unk', plural: false });

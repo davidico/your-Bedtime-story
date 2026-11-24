@@ -21,7 +21,7 @@ function world(code) {
   const storage = memStorage(code ? { 'ys:code': code } : {});
   const ai = createAI({ fetchImpl, storage });
   const scene = new Scene(), d = createDirector({ scene, ai });
-  const say = text => d.onEvents(tokens(text).filter(t => t.kind !== 'none'));
+  const say = text => d.onEvents(tokens(text).filter(t => t.kind !== 'none' || t.gap));
   return { env, ai, scene, say, storage, stats: () => ({ generated, requests }) };
 }
 const live = (scene, k) => scene.items.filter(i => i.key === k && !i.fadeAt);
