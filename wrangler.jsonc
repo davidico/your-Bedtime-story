@@ -15,7 +15,7 @@
   },
   // Crear con `npx wrangler kv namespace create FIGURES` y pegar aquí el id.
   // `wrangler dev` simula el KV en local, así que el marcador sirve para probar.
-  "kv_namespaces": [{ "binding": "FIGURES", "id": "<pendiente>" }],
+  "kv_namespaces": [{ "binding": "FIGURES", "id": "3c60fac640234820bdc346995b346096" }],
   "ratelimits": [
     { "name": "FIGURE_LIMITER", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } }
   ],
@@ -25,7 +25,7 @@
     // `npx wrangler deploy --env preview`: KV, límites y secretos propios (código de familia distinto).
     // kv_namespaces, ratelimits y vars no se heredan: hay que repetirlos en cada entorno.
     "preview": {
-      "kv_namespaces": [{ "binding": "FIGURES", "id": "<pendiente-preview>" }],
+      "kv_namespaces": [{ "binding": "FIGURES", "id": "9a84529c85f7419a862e1a78cfb058fe" }],
       "ratelimits": [
         { "name": "FIGURE_LIMITER", "namespace_id": "1002", "simple": { "limit": 20, "period": 60 } }
       ],
