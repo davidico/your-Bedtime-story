@@ -61,7 +61,7 @@ Riesgos que el spec implica, cada uno cubierto por una prueba en la tarea indica
 
 ---
 
-### Tarea 1: Herramientas de prueba + figuras con `main`, tinte y registro
+### Task 1: Herramientas de prueba + figuras con `main`, tinte y registro
 
 **Archivos:**
 - Modificar: `package.json`, `lib/figures.js`
@@ -103,7 +103,7 @@ test('registerFigure exige prefijo g:', () => {
 
 ---
 
-### Tarea 2: Formato de figura compartido (`lib/figure-format.js`)
+### Task 2: Formato de figura compartido (`lib/figure-format.js`)
 
 **Archivos:**
 - Crear: `lib/figure-format.js`, `test/figure-format.test.js`
@@ -170,7 +170,7 @@ test('normalización y validación de conceptos', () => {
 
 ---
 
-### Tarea 3: Vocabulario: `unk` y `color`
+### Task 3: Vocabulario: `unk` y `color`
 
 **Archivos:**
 - Modificar: `lib/vocab.js`
@@ -218,7 +218,7 @@ En `kinds('el panda')`, el artículo `el` sigue emitiendo `art`.
 
 ---
 
-### Tarea 4: Escena: ids, tinte, elementos pendientes
+### Task 4: Escena: ids, tinte, elementos pendientes
 
 **Archivos:**
 - Modificar: `lib/scene.js`, `lib/figures.js` (figura interna `__pending`)
@@ -278,7 +278,7 @@ test('ids no se reutilizan tras clear (respuesta tardía no resucita)', () => {
 
 ---
 
-### Tarea 5: Parciales de voz estables
+### Task 5: Parciales de voz estables
 
 **Archivos:**
 - Crear: `lib/partials.js`, `test/partials.test.js`
@@ -309,7 +309,7 @@ test('retiene el desconocido final de un parcial', () => {
 
 ---
 
-### Tarea 6: Cliente IA y director
+### Task 6: Cliente IA y director
 
 **Archivos:**
 - Crear: `lib/ai.js`, `lib/director.js`, `test/ai.test.js`, `test/director.test.js`
@@ -377,7 +377,7 @@ test('director: sin IA, el desconocido no deja rastro y lo conocido sigue', () =
 
 ---
 
-### Tarea 7: Worker: `/api/figure` con controles, KV y simulación
+### Task 7: Worker: `/api/figure` con controles, KV y simulación
 
 **Archivos:**
 - Crear: `worker/index.js`, `worker/api.js`, `worker/blocklist.js`, `worker/figure-ai.js` (en esta tarea solo `mockGenerateFigure`), `test/worker.test.js`
@@ -437,7 +437,7 @@ Escribe las pruebas comentadas completas con el patrón de las dos primeras.
 
 ---
 
-### Tarea 8: Generador con Claude y prompt de figura
+### Task 8: Generador con Claude y prompt de figura
 
 **Archivos:**
 - Crear: `worker/prompts/figure.js`, `test/figure-ai.test.js`
@@ -490,7 +490,7 @@ Un error lanzado por el SDK también devuelve `null`. Añade un caso de prueba p
 
 ---
 
-### Tarea 9: Configuración, interfaz y prueba de punta a punta con simulación
+### Task 9: Configuración, interfaz y prueba de punta a punta con simulación
 
 **Archivos:**
 - Modificar: `wrangler.jsonc`, `.gitignore`, `README.md`, `components/StoryCanvas.jsx`
@@ -531,7 +531,7 @@ Resultado esperado: `{"status":"ok","key":"panda","figure":{...}}`. Con `X-Famil
 
 ---
 
-### Tarea 10: Hoja de contacto y medición real
+### Task 10: Hoja de contacto y medición real
 
 **Archivos:**
 - Crear: `scripts/contact-sheet.mjs`, `scripts/concepts.txt` (unos 30 conceptos: panda, vaca, monstruo, dinosaurio, unicornio, jirafa, elefante, tren, avión, cohete, pastel, bruja, fantasma, pirata, tortuga, caracol, ballena, pulpo, tiburón, robot, hada, sirena, tractor, helado, caballo, león, mono, búho, nave espacial, rana)
