@@ -1,0 +1,31 @@
+# Conceptos de la hoja de contacto: uno por línea; las líneas con # se ignoran.
+panda
+vaca
+monstruo
+dinosaurio
+unicornio
+jirafa
+elefante
+tren
+avión
+cohete
+pastel
+bruja
+fantasma
+pirata
+tortuga
+caracol
+ballena
+pulpo
+tiburón
+robot
+hada
+sirena
+tractor
+helado
+caballo
+león
+mono
+búho
+nave espacial
+rana

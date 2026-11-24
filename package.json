@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "npx serve out",
     "test": "vitest run",
-    "preview": "next build && wrangler dev"
+    "preview": "next build && wrangler dev",
+    "contact-sheet": "vite-node scripts/contact-sheet.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.13.0",
@@ -16,6 +17,7 @@
     "react-dom": "19.1.1"
   },
   "devDependencies": {
+    "vite-node": "^6.0.0",
     "vitest": "^5.1.1",
     "wrangler": "^4.167.0"
   }
