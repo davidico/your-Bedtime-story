@@ -49,3 +49,40 @@ test('extra: esquema, claves de alias, escalado de figuras pequeñas y expansió
   expect(d[0].fill).toBe('#e2533f'); expect(d[1].closed).toBe(false); expect(d[1].color).toBeUndefined();
   expect(sanitizeFigure({ ...ok([]), status: 'blocked', canonical: '' })).toBeNull();
 });
+
+// Generador pseudoaleatorio con semilla (mulberry32) para pruebas de propiedades reproducibles.
+const rng = seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+test('sanear es idempotente (propiedad con figuras aleatorias y casos límite)', () => {
+  const R = rng(42), num = () => R() * 140 - 20, rad = () => R() * 60;
+  const colors = ['ink', 'white', 'red', 'green'], types = ['circle', 'ellipse', 'rect', 'poly', 'line', 'dot'];
+  const randPrim = () => {
+    const t = types[Math.floor(R() * types.length)], color = colors[Math.floor(R() * colors.length)];
+    const n = t === 'circle' || t === 'dot' ? [num(), num(), rad()] : t === 'ellipse' ? [num(), num(), rad(), rad()]
+      : t === 'rect' ? [num(), num(), num(), num()] : Array.from({ length: 2 * (2 + Math.floor(R() * 6)) }, num);
+    if (R() < 0.3) for (let i = 0; i < n.length; i++) n[i] = n[i] / 8 + 50; // figuras pequeñas: activan el escalado
+    return { t, n, color };
+  };
+  const figs = Array.from({ length: 600 }, () => ok(Array.from({ length: 2 + Math.floor(R() * 8) }, randPrim), { band: R() < 0.8 ? 'ground' : 'sky' }));
+  figs.push(
+    ok([{ t: 'circle', n: [100, 50, 6], color: 'white' }, { t: 'rect', n: [90, 50, 99, 55], color: 'red' }]), // círculo en el borde
+    ok([{ t: 'circle', n: [50, 0, 50], color: 'white' }, { t: 'ellipse', n: [50, 100, 10, 50], color: 'red' }]), // alta y con radio grande
+    ok([{ t: 'rect', n: [0, 50, 100, 52], color: 'white' }, { t: 'circle', n: [0, 51, 1.333], color: 'red' }]), // ancha y plana
+    ok([{ t: 'circle', n: [33.333, 33.337, 3.333], color: 'white' }, { t: 'circle', n: [66.667, 30.001, 3.337], color: 'red' }]),
+  );
+  let checked = 0;
+  for (const f of figs) {
+    const a = sanitizeFigure(f); if (!a) continue;
+    checked++;
+    expect(sanitizeFigure(a)).toEqual(a);
+    if (a.band === 'ground') expect(Math.max(...a.prims.map(p => p.t === 'circle' || p.t === 'dot' ? p.n[1] + p.n[2] : p.t === 'ellipse' ? p.n[1] + p.n[3] : Math.max(...p.n.filter((_, i) => i % 2))))).toBeCloseTo(100, 5);
+  }
+  expect(checked).toBeGreaterThan(300);
+});
+test('normalizar conceptos es idempotente y respeta los singulares en -s', () => {
+  const words = ['pandas', 'peces', 'leones', 'dinosaurios', 'osos polares', 'autobus', 'autobuses', 'tres', 'mes', 'meses', 'pais', 'paises',
+    'dios', 'tos', 'gas', 'cactus', 'virus', 'paraguas', 'ciempiés', 'ananás', 'cumpleaños', 'lunes', 'martes', 'arcoíris', 'reyes', 'luces',
+    'nueces', 'raíces', 'gatos', 'flores', 'árboles', 'jabalís', 'colibríes', 'ratones', 'pies', 'bus'];
+  for (const w of words) expect(normalizeConcept(normalizeConcept(w))).toBe(normalizeConcept(w));
+  expect(normalizeConcept('autobus')).toBe('autobus'); expect(normalizeConcept('autobuses')).toBe('autobus');
+  expect(normalizeConcept('tres')).toBe('tres'); expect(normalizeConcept('meses')).toBe('mes'); expect(normalizeConcept('arcoíris')).toBe('arcoiris');
+});
