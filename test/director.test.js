@@ -1,26 +1,25 @@
 import { createDirector } from '@/lib/director';
 import { Scene } from '@/lib/scene';
 import { tokens } from '@/lib/vocab';
-import { registerFigure, P, S, circ } from '@/lib/figures';
+import { FIG } from '@/lib/figures';
 import { createAI } from '@/lib/ai';
 import { fakeAI, fakeFetch, memStorage, flush, PANDA } from './helpers.js';
-
-registerFigure('g:panda', { band: 'ground', size: 140, layer: 2, main: 'white', draw: () => [S(circ(50, 60, 30), P.white)] });
 
 test('director: dos pandas seguidos, una petición, dos figuras resueltas', async () => {
   const scene = new Scene();
   const { fetchImpl, calls } = fakeFetch({ status: 'ok', key: 'panda', figure: PANDA });
   const ai = createAI({ fetchImpl, storage: memStorage({ 'ys:code': 'abc' }) });
   const d = createDirector({ scene, ai });
+  expect(FIG['g:panda']).toBeUndefined(); // la registra el cliente IA, no la prueba
   d.onEvents(tokens('un panda')); d.onEvents(tokens('otro panda').filter(t => t.kind !== 'none'));
   await flush(); expect(scene.items.filter(i => i.key === 'g:panda')).toHaveLength(2); expect(calls()).toBe(1);
 });
 test('director: pasa concepto normalizado, palabra original y plural', async () => {
-  const scene = new Scene(); const ai = fakeAI({ tigr: { status: 'ok', key: 'g:panda' } });
+  const scene = new Scene(); const ai = fakeAI({ tigr: { status: 'builtin', key: 'gato' } });
   createDirector({ scene, ai }).onEvents(tokens('dos tigres'));
   expect(ai.asked).toEqual([{ concept: 'tigr', word: 'tigres' }]);
   expect(scene.items.filter(i => i.pending)).toHaveLength(2);
-  await flush(); expect(scene.items.filter(i => i.key === 'g:panda')).toHaveLength(2);
+  await flush(); expect(scene.items.filter(i => i.key === 'gato')).toHaveLength(2);
 });
 test('director: sin IA, el desconocido no deja rastro y lo conocido sigue', () => {
   const scene = new Scene(); const ai = fakeAI({}, { enabled: false }); const d = createDirector({ scene, ai });

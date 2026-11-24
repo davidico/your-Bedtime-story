@@ -61,6 +61,29 @@ test('builtin usa la figura local; si no existe, error', async () => {
   const ai2 = createAI({ fetchImpl: fakeFetch({ status: 'builtin', key: 'nada' }).fetchImpl, storage: memStorage({ 'ys:code': 'abc' }) });
   expect(await ai2.figure('nada')).toEqual({ status: 'error' });
 });
+test('builtin heredado, interno o de fondo → error sin cachear', async () => {
+  for (const key of ['constructor', '__proto__', 'toString', '__pending', 'mar']) {
+    const f = fakeFetch({ status: 'builtin', key }); const storage = memStorage({ 'ys:code': 'abc' });
+    const ai = createAI({ fetchImpl: f.fetchImpl, storage });
+    expect(await ai.figure('cosa')).toEqual({ status: 'error' }); await ai.figure('cosa');
+    expect(f.calls()).toBe(2); expect(storage.data['ys:fig:v1']).toBeUndefined();
+  }
+});
+test('ok: la clave sale de figure.canonical, no de key', async () => {
+  const { fetchImpl } = fakeFetch({ status: 'ok', key: 'otra', figure: { ...PANDA, canonical: 'oso panda' } });
+  const ai = createAI({ fetchImpl, storage: memStorage({ 'ys:code': 'abc' }) });
+  expect(await ai.figure('panda')).toEqual({ status: 'ok', key: 'g:oso panda' });
+  expect(FIG['g:oso panda']).toBeTruthy(); expect(FIG['g:otra']).toBeUndefined();
+});
+test('entrada envenenada en L1: se descarta y se vuelve a pedir', async () => {
+  const bad = { status: 'ok', key: 'vaca', figure: { ...PANDA, canonical: 'vaca', prims: [{ t: 'line', n: [0, 0, 1, 1], color: 'ink' }] } };
+  const storage = memStorage({ 'ys:code': 'abc', 'ys:fig:v1': JSON.stringify({ vaca: bad, gato: { status: 'builtin', key: 'constructor' } }) });
+  const { fetchImpl, calls } = fakeFetch({ status: 'ok', key: 'vaca', figure: { ...PANDA, canonical: 'vaca' } });
+  const ai = createAI({ fetchImpl, storage });
+  expect(await ai.figure('vaca')).toEqual({ status: 'ok', key: 'g:vaca' }); expect(calls()).toBe(1);
+  expect(JSON.parse(storage.data['ys:fig:v1']).vaca.figure.prims).toHaveLength(3);
+  await ai.figure('gato'); expect(calls()).toBe(2); expect(JSON.parse(storage.data['ys:fig:v1']).gato.key).not.toBe('constructor');
+});
 test('figura inválida o respuesta rara → error sin cachear', async () => {
   const bad = fakeFetch({ status: 'ok', key: 'vaca', figure: { ...PANDA, prims: [] } });
   const ai = createAI({ fetchImpl: bad.fetchImpl, storage: memStorage({ 'ys:code': 'abc' }) });
